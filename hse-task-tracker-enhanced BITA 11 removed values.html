@@ -1,0 +1,2157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HSE Task Tracking System</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    :root {
+      /* SA Public Hosting brand colors */
+      --sa-primary: #005288;
+      --sa-secondary: #84BD00;
+      --sa-dark: #003865;
+      --sa-light: #F2F6FA;
+      --sa-accent: #FFB81C;
+      --sa-gray: #54565A;
+    }
+    
+    body {
+      background-color: var(--sa-light);
+      font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', sans-serif;
+    }
+    
+    .header-gradient {
+      background: linear-gradient(to right, var(--sa-dark), var(--sa-primary));
+    }
+    
+    .dashboard-card {
+      transition: all 0.3s ease;
+      border-left: 4px solid var(--sa-primary);
+    }
+    
+    .dashboard-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .task-modal, .comments-modal, .template-modal, .reminder-modal, .team-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    
+    .task-modal.active, .comments-modal.active, .template-modal.active, .reminder-modal.active, .team-modal.active {
+      display: flex;
+    }
+    
+    .btn-primary {
+      background-color: var(--sa-primary);
+      color: white;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-primary:hover {
+      background-color: var(--sa-dark);
+    }
+    
+    .priority-low { background-color: #E1F5FE; color: var(--sa-primary); border-left: 3px solid var(--sa-primary); }
+    .priority-medium { background-color: #FFF8E1; color: #F57F17; border-left: 3px solid #F57F17; }
+    .priority-high { background-color: #FFEBEE; color: #C62828; border-left: 3px solid #C62828; }
+    .priority-critical { background-color: #C62828; color: white; border-left: 3px solid #7f1d1d; }
+    
+    .category-lprc { background-color: #E8F5E9; color: var(--sa-secondary); border-left: 3px solid var(--sa-secondary); }
+    .category-documentation { background-color: #E3F2FD; color: var(--sa-primary); border-left: 3px solid var(--sa-primary); }
+    .category-incident { background-color: #FBE9E7; color: #C62828; border-left: 3px solid #C62828; }
+    .category-risk-assessment { background-color: #FFF8E1; color: var(--sa-accent); border-left: 3px solid var(--sa-accent); }
+    .category-compliance { background-color: #E8F5E9; color: #2E7D32; border-left: 3px solid #2E7D32; }
+    
+    .status-inprogress { background-color: #E3F2FD; color: var(--sa-primary); border-left: 3px solid var(--sa-primary); }
+    .status-completed { background-color: #E8F5E9; color: var(--sa-secondary); border-left: 3px solid var(--sa-secondary); }
+    .status-overdue { background-color: #FFEBEE; color: #C62828; border-left: 3px solid #C62828; }
+    
+    table th {
+      position: sticky;
+      top: 0;
+      background-color: #f9fafb;
+      z-index: 10;
+    }
+    
+    .status-badge, .priority-badge, .category-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-weight: 600;
+      font-size: 0.75rem;
+      display: inline-flex;
+      align-items: center;
+    }
+    
+    .status-badge i, .priority-badge i {
+      margin-right: 0.25rem;
+    }
+    
+    .comment-item {
+      border-left: 3px solid var(--sa-primary);
+      margin-bottom: 8px;
+      padding: 8px;
+      background-color: #f9fafb;
+      border-radius: 0 4px 4px 0;
+    }
+    
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+    }
+    
+    .toast {
+      padding: 12px 20px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      animation: slideIn 0.3s ease forwards;
+      max-width: 300px;
+    }
+    
+    .toast-success {
+      background-color: #4CAF50;
+      color: white;
+    }
+    
+    .toast-error {
+      background-color: #F44336;
+      color: white;
+    }
+    
+    .toast-warning {
+      background-color: #FF9800;
+      color: white;
+    }
+    
+    .toast-info {
+      background-color: var(--sa-primary);
+      color: white;
+    }
+    
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    
+    .recurring-option {
+      display: none;
+    }
+    
+    .recurring-option.active {
+      display: block;
+    }
+    
+    /* Bell notification animation */
+    .notification-bell {
+      position: relative;
+    }
+    
+    .notification-badge {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background-color: #FF5252;
+      color: white;
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+    
+    .theme-toggle {
+      cursor: pointer;
+    }
+    
+    .sort-icon {
+      font-size: 0.7rem;
+      margin-left: 5px;
+    }
+    
+    .team-member-card {
+      transition: all 0.3s ease;
+    }
+    
+    .team-member-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body class="bg-gray-100">
+  <!-- Toast Notifications Container -->
+  <div id="toast-container" class="toast-container"></div>
+  
+  <div class="container mx-auto px-4 py-6">
+    <!-- Header -->
+    <header class="header-gradient text-white p-6 mb-6 rounded-lg shadow-lg">
+      <div class="flex justify-between items-center">
+        <div>
+          <h1 class="text-3xl font-bold">HSE Task Tracking System</h1>
+          <p class="text-green-100 mt-1">Manage Health, Safety and Environmental tasks efficiently</p>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span id="current-date" class="hidden md:inline bg-white/20 py-1 px-3 rounded"></span>
+          
+          <!-- Notifications Icon -->
+          <div class="notification-bell relative">
+            <button id="notifications-btn" class="bg-white/20 text-white p-2 rounded-full">
+              <i class="fas fa-bell"></i>
+            </button>
+            <span id="notification-badge" class="notification-badge hidden">0</span>
+          </div>
+          
+          <!-- Team Button -->
+          <button id="team-btn" class="bg-white/20 text-white p-2 rounded-full">
+            <i class="fas fa-users"></i>
+          </button>
+          
+          <!-- Export/Import Dropdown -->
+          <div class="relative inline-block text-left">
+            <button id="export-import-btn" class="bg-white/20 text-white p-2 rounded-full">
+              <i class="fas fa-download"></i>
+            </button>
+            <div id="export-import-dropdown" class="hidden absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
+              <div class="py-1">
+                <button id="export-tasks-btn" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                  <i class="fas fa-file-export mr-2"></i> Export Tasks
+                </button>
+                <label for="import-tasks-input" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer">
+                  <i class="fas fa-file-import mr-2"></i> Import Tasks
+                </label>
+                <input id="import-tasks-input" type="file" accept=".json" class="hidden">
+              </div>
+            </div>
+          </div>
+          
+          <button id="add-task-btn" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg shadow hover:bg-gray-300 transition-all duration-200 flex items-center">
+            <i class="fas fa-plus mr-2"></i> New Task
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Dashboard Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div id="total-tasks-card" class="bg-white rounded-lg shadow-md p-6 dashboard-card">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-sm text-gray-500 mb-1">Total Tasks</p>
+            <h2 id="total-tasks-count" class="text-3xl font-bold text-gray-700">0</h2>
+          </div>
+          <div class="bg-[#E3F2FD] p-3 rounded-full">
+            <i class="fas fa-tasks text-[#005288] text-xl"></i>
+          </div>
+        </div>
+        <div class="mt-4">
+          <span class="text-xs text-gray-500">View all tasks</span>
+        </div>
+      </div>
+      
+      <div id="inprogress-tasks-card" class="bg-white rounded-lg shadow-md p-6 dashboard-card" style="border-left-color: #6366f1;">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-sm text-gray-500 mb-1">In Progress Tasks</p>
+            <h2 id="inprogress-tasks-count" class="text-3xl font-bold text-gray-700">0</h2>
+          </div>
+          <div class="bg-[#E3F2FD] p-3 rounded-full">
+            <i class="fas fa-spinner text-[#005288] text-xl"></i>
+          </div>
+        </div>
+        <div class="mt-4">
+          <div class="w-full bg-gray-200 rounded-full h-2">
+            <div id="inprogress-tasks-bar" class="bg-[#005288] h-2 rounded-full" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+      
+      <div id="overdue-tasks-card" class="bg-white rounded-lg shadow-md p-6 dashboard-card" style="border-left-color: #ef4444;">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-sm text-gray-500 mb-1">Overdue Tasks</p>
+            <h2 id="overdue-tasks-count" class="text-3xl font-bold text-gray-700">0</h2>
+          </div>
+          <div class="bg-[#FFEBEE] p-3 rounded-full">
+            <i class="fas fa-exclamation-triangle text-[#C62828] text-xl"></i>
+          </div>
+        </div>
+        <div class="mt-4">
+          <div class="w-full bg-gray-200 rounded-full h-2">
+            <div id="overdue-tasks-bar" class="bg-[#C62828] h-2 rounded-full" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+      
+      <div id="completed-tasks-card" class="bg-white rounded-lg shadow-md p-6 dashboard-card" style="border-left-color: #10b981;">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-sm text-gray-500 mb-1">Completed Tasks</p>
+            <h2 id="completed-tasks-count" class="text-3xl font-bold text-gray-700">0</h2>
+          </div>
+          <div class="bg-[#E8F5E9] p-3 rounded-full">
+            <i class="fas fa-check-circle text-[#84BD00] text-xl"></i>
+          </div>
+        </div>
+        <div class="mt-4">
+          <div class="w-full bg-gray-200 rounded-full h-2">
+            <div id="completed-tasks-bar" class="bg-[#84BD00] h-2 rounded-full" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Task Search and Filters -->
+    <div class="bg-white p-5 mb-6 rounded-lg shadow-md">
+      <div class="flex flex-col md:flex-row justify-between mb-3">
+        <h2 class="text-lg font-semibold flex items-center">
+          <i class="fas fa-filter mr-2 text-[#005288]"></i> Filters
+        </h2>
+        <div class="mt-2 md:mt-0 relative">
+          <input id="task-search" type="text" placeholder="Search tasks..." class="w-full md:w-64 pl-10 pr-4 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500">
+          <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <select id="status-filter" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500">
+            <option value="all">All Statuses</option>
+            <option value="inprogress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="overdue">Overdue</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+          <select id="priority-filter" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500">
+            <option value="all">All Priorities</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+          <select id="category-filter" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500">
+            <option value="all">All Categories</option>
+            <option value="lprc">LPRC</option>
+            <option value="documentation">Documentation</option>
+            <option value="incident">Incident Investigation</option>
+            <option value="risk-assessment">Risk Assessment</option>
+            <option value="compliance">Compliance</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+          <select id="assigned-filter" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500">
+            <option value="all">All Employees</option>
+            <option value="john-doe">John Doe</option>
+            <option value="jane-smith">Jane Smith</option>
+            <option value="mike-johnson">Mike Johnson</option>
+            <option value="sarah-williams">Sarah Williams</option>
+            <option value="david-brown">David Brown</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Task List -->
+    <div class="bg-white p-5 rounded-lg shadow-md mb-6">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="text-lg font-semibold flex items-center">
+          <i class="fas fa-clipboard-list mr-2 text-[#005288]"></i> Tasks
+        </h2>
+        <div class="flex items-center">
+          <label class="mr-2 text-sm font-medium text-gray-700">View:</label>
+          <div class="flex border rounded-md overflow-hidden">
+            <button id="view-all" class="px-3 py-1 bg-[#005288] text-white">All</button>
+            <button id="view-today" class="px-3 py-1 bg-white text-gray-700 border-l">Today</button>
+            <button id="view-week" class="px-3 py-1 bg-white text-gray-700 border-l">This Week</button>
+          </div>
+        </div>
+      </div>
+      <div class="overflow-x-auto max-h-96 overflow-y-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned To</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="task-list" class="bg-white divide-y divide-gray-200">
+            <!-- Task rows will be generated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Modal for adding/editing tasks -->
+    <div id="task-modal" class="task-modal">
+      <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl mx-4">
+        <div class="flex justify-between items-center mb-4">
+          <h2 id="modal-title" class="text-xl font-bold">Add New Task</h2>
+          <button id="close-modal" class="text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        <form id="task-form">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+              <input type="text" id="task-title" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <select id="task-category" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500">
+                <option value="lprc">LPRC</option>
+                <option value="documentation">Documentation</option>
+                <option value="incident">Incident Investigation</option>
+                <option value="risk-assessment">Risk Assessment</option>
+                <option value="compliance">Compliance</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+              <select id="task-priority" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select id="task-status" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500">
+                <option value="inprogress">In Progress</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+              <select id="task-assigned" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500">
+                <option value="john-doe">John Doe</option>
+                <option value="jane-smith">Jane Smith</option>
+                <option value="mike-johnson">Mike Johnson</option>
+                <option value="sarah-williams">Sarah Williams</option>
+                <option value="david-brown">David Brown</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+              <input type="date" id="task-due-date" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+            </div>
+          </div>
+          
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea id="task-description" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" rows="3"></textarea>
+          </div>
+          
+          <div class="flex justify-end space-x-3">
+            <button type="button" id="cancel-task" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">Cancel</button>
+            <button type="submit" id="save-task" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">Save Task</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <!-- Task Comments Modal -->
+    <div id="comments-modal" class="comments-modal">
+      <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl mx-4">
+        <div class="flex justify-between items-center mb-4">
+          <h2 id="comments-modal-title" class="text-xl font-bold">Task Comments</h2>
+          <button id="close-comments-modal" class="text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <div id="comments-container" class="mb-4 max-h-80 overflow-y-auto">
+          <!-- Comments will be loaded here -->
+        </div>
+        
+        <form id="comment-form">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Add a comment</label>
+            <textarea id="comment-text" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" rows="3" required></textarea>
+          </div>
+          <div class="flex justify-end">
+            <button type="submit" id="add-comment" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
+              <i class="fas fa-comment mr-2"></i> Add Comment
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <!-- Team Modal -->
+    <div id="team-modal" class="team-modal">
+      <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl mx-4">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold">Team Members</h2>
+          <div>
+            <button id="add-employee-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
+              <i class="fas fa-user-plus mr-2"></i> Add Team Member
+            </button>
+            <button id="close-team-modal" class="ml-2 text-gray-400 hover:text-gray-600">
+              <i class="fas fa-times text-xl"></i>
+            </button>
+          </div>
+        </div>
+        
+        <!-- New Team Member Form (Hidden by default) -->
+        <div id="new-employee-form" class="mb-4 p-4 border rounded-lg bg-gray-50 hidden">
+          <h3 class="font-medium mb-3">Add New Team Member</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <input type="text" id="new-employee-name" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+              <input type="text" id="new-employee-title" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input type="email" id="new-employee-email" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <input type="tel" id="new-employee-phone" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500">
+            </div>
+          </div>
+          <div class="flex justify-end space-x-3">
+            <button type="button" id="cancel-new-employee" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
+              Cancel
+            </button>
+            <button type="button" id="save-new-employee" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
+              Save
+            </button>
+          </div>
+        </div>
+        
+        <div class="mb-4">
+          <p class="text-sm text-gray-500 mb-4">View and manage team members.</p>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Team Member - John Doe -->
+            <div class="team-member-card bg-white p-4 border rounded-lg shadow-sm" data-id="john-doe">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center">
+                  <div class="h-12 w-12 bg-[#E3F2FD] rounded-full flex items-center justify-center mr-3">
+                    <span class="text-xl font-medium text-[#005288]">JD</span>
+                  </div>
+                  <div>
+                    <h3 class="font-medium employee-name">John Doe</h3>
+                    <p class="text-sm text-gray-500 employee-title">Safety Officer</p>
+                  </div>
+                </div>
+                <button class="edit-employee-btn text-[#005288] hover:text-[#003865]">
+                  <i class="fas fa-edit"></i>
+                </button>
+              </div>
+              <div class="employee-details">
+                <div class="text-sm text-gray-600">
+                  <div class="flex items-center mb-1">
+                    <i class="fas fa-envelope text-gray-400 w-5"></i>
+                    <span class="employee-email">john.doe@company.com</span>
+                  </div>
+                  <div class="flex items-center">
+                    <i class="fas fa-phone text-gray-400 w-5"></i>
+                    <span class="employee-phone">+1 (555) 123-4567</span>
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <i class="fas fa-clipboard-check mr-1"></i> 0 Active Tasks
+                  </span>
+                </div>
+              </div>
+              
+              <!-- Edit Form (Hidden by Default) -->
+              <div class="employee-edit-form hidden mt-3 pt-3 border-t">
+                <div class="grid grid-cols-1 gap-2">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Name</label>
+                    <input type="text" class="edit-name w-full p-2 border rounded-md text-sm" value="John Doe">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Job Title</label>
+                    <input type="text" class="edit-title w-full p-2 border rounded-md text-sm" value="Safety Officer">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Email</label>
+                    <input type="email" class="edit-email w-full p-2 border rounded-md text-sm" value="john.doe@company.com">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Phone</label>
+                    <input type="text" class="edit-phone w-full p-2 border rounded-md text-sm" value="+1 (555) 123-4567">
+                  </div>
+                  <div class="flex justify-end space-x-2 mt-2">
+                    <button type="button" class="cancel-edit-btn px-3 py-1 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
+                      Cancel
+                    </button>
+                    <button type="button" class="save-employee-btn px-3 py-1 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Team Member - Jane Smith -->
+            <div class="team-member-card bg-white p-4 border rounded-lg shadow-sm" data-id="jane-smith">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center">
+                  <div class="h-12 w-12 bg-[#E3F2FD] rounded-full flex items-center justify-center mr-3">
+                    <span class="text-xl font-medium text-[#005288]">JS</span>
+                  </div>
+                  <div>
+                    <h3 class="font-medium employee-name">Jane Smith</h3>
+                    <p class="text-sm text-gray-500 employee-title">HSE Manager</p>
+                  </div>
+                </div>
+                <button class="edit-employee-btn text-[#005288] hover:text-[#003865]">
+                  <i class="fas fa-edit"></i>
+                </button>
+              </div>
+              <div class="employee-details">
+                <div class="text-sm text-gray-600">
+                  <div class="flex items-center mb-1">
+                    <i class="fas fa-envelope text-gray-400 w-5"></i>
+                    <span class="employee-email">jane.smith@company.com</span>
+                  </div>
+                  <div class="flex items-center">
+                    <i class="fas fa-phone text-gray-400 w-5"></i>
+                    <span class="employee-phone">+1 (555) 234-5678</span>
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <i class="fas fa-clipboard-check mr-1"></i> 0 Active Tasks
+                  </span>
+                </div>
+              </div>
+              
+              <!-- Edit Form (Hidden by Default) -->
+              <div class="employee-edit-form hidden mt-3 pt-3 border-t">
+                <div class="grid grid-cols-1 gap-2">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Name</label>
+                    <input type="text" class="edit-name w-full p-2 border rounded-md text-sm" value="Jane Smith">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Job Title</label>
+                    <input type="text" class="edit-title w-full p-2 border rounded-md text-sm" value="HSE Manager">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Email</label>
+                    <input type="email" class="edit-email w-full p-2 border rounded-md text-sm" value="jane.smith@company.com">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Phone</label>
+                    <input type="text" class="edit-phone w-full p-2 border rounded-md text-sm" value="+1 (555) 234-5678">
+                  </div>
+                  <div class="flex justify-end space-x-2 mt-2">
+                    <button type="button" class="cancel-edit-btn px-3 py-1 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
+                      Cancel
+                    </button>
+                    <button type="button" class="save-employee-btn px-3 py-1 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Team Member - Mike Johnson -->
+            <div class="team-member-card bg-white p-4 border rounded-lg shadow-sm" data-id="mike-johnson">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center">
+                  <div class="h-12 w-12 bg-[#E3F2FD] rounded-full flex items-center justify-center mr-3">
+                    <span class="text-xl font-medium text-[#005288]">MJ</span>
+                  </div>
+                  <div>
+                    <h3 class="font-medium employee-name">Mike Johnson</h3>
+                    <p class="text-sm text-gray-500 employee-title">Safety Engineer</p>
+                  </div>
+                </div>
+                <button class="edit-employee-btn text-[#005288] hover:text-[#003865]">
+                  <i class="fas fa-edit"></i>
+                </button>
+              </div>
+              <div class="employee-details">
+                <div class="text-sm text-gray-600">
+                  <div class="flex items-center mb-1">
+                    <i class="fas fa-envelope text-gray-400 w-5"></i>
+                    <span class="employee-email">mike.johnson@company.com</span>
+                  </div>
+                  <div class="flex items-center">
+                    <i class="fas fa-phone text-gray-400 w-5"></i>
+                    <span class="employee-phone">+1 (555) 345-6789</span>
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    <i class="fas fa-check-circle mr-1"></i> All Tasks Complete
+                  </span>
+                </div>
+              </div>
+              
+              <!-- Edit Form (Hidden by Default) -->
+              <div class="employee-edit-form hidden mt-3 pt-3 border-t">
+                <div class="grid grid-cols-1 gap-2">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Name</label>
+                    <input type="text" class="edit-name w-full p-2 border rounded-md text-sm" value="Mike Johnson">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Job Title</label>
+                    <input type="text" class="edit-title w-full p-2 border rounded-md text-sm" value="Safety Engineer">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Email</label>
+                    <input type="email" class="edit-email w-full p-2 border rounded-md text-sm" value="mike.johnson@company.com">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Phone</label>
+                    <input type="text" class="edit-phone w-full p-2 border rounded-md text-sm" value="+1 (555) 345-6789">
+                  </div>
+                  <div class="flex justify-end space-x-2 mt-2">
+                    <button type="button" class="cancel-edit-btn px-3 py-1 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
+                      Cancel
+                    </button>
+                    <button type="button" class="save-employee-btn px-3 py-1 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Team Member - Sarah Williams -->
+            <div class="team-member-card bg-white p-4 border rounded-lg shadow-sm" data-id="sarah-williams">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center">
+                  <div class="h-12 w-12 bg-[#E3F2FD] rounded-full flex items-center justify-center mr-3">
+                    <span class="text-xl font-medium text-[#005288]">SW</span>
+                  </div>
+                  <div>
+                    <h3 class="font-medium employee-name">Sarah Williams</h3>
+                    <p class="text-sm text-gray-500 employee-title">Environmental Specialist</p>
+                  </div>
+                </div>
+                <button class="edit-employee-btn text-[#005288] hover:text-[#003865]">
+                  <i class="fas fa-edit"></i>
+                </button>
+              </div>
+              <div class="employee-details">
+                <div class="text-sm text-gray-600">
+                  <div class="flex items-center mb-1">
+                    <i class="fas fa-envelope text-gray-400 w-5"></i>
+                    <span class="employee-email">sarah.williams@company.com</span>
+                  </div>
+                  <div class="flex items-center">
+                    <i class="fas fa-phone text-gray-400 w-5"></i>
+                    <span class="employee-phone">+1 (555) 456-7890</span>
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <i class="fas fa-clipboard-check mr-1"></i> 0 Active Tasks
+                  </span>
+                </div>
+              </div>
+              
+              <!-- Edit Form (Hidden by Default) -->
+              <div class="employee-edit-form hidden mt-3 pt-3 border-t">
+                <div class="grid grid-cols-1 gap-2">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Name</label>
+                    <input type="text" class="edit-name w-full p-2 border rounded-md text-sm" value="Sarah Williams">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Job Title</label>
+                    <input type="text" class="edit-title w-full p-2 border rounded-md text-sm" value="Environmental Specialist">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Email</label>
+                    <input type="email" class="edit-email w-full p-2 border rounded-md text-sm" value="sarah.williams@company.com">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Phone</label>
+                    <input type="text" class="edit-phone w-full p-2 border rounded-md text-sm" value="+1 (555) 456-7890">
+                  </div>
+                  <div class="flex justify-end space-x-2 mt-2">
+                    <button type="button" class="cancel-edit-btn px-3 py-1 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
+                      Cancel
+                    </button>
+                    <button type="button" class="save-employee-btn px-3 py-1 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Team Member - David Brown -->
+            <div class="team-member-card bg-white p-4 border rounded-lg shadow-sm" data-id="david-brown">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center">
+                  <div class="h-12 w-12 bg-[#E3F2FD] rounded-full flex items-center justify-center mr-3">
+                    <span class="text-xl font-medium text-[#005288]">DB</span>
+                  </div>
+                  <div>
+                    <h3 class="font-medium employee-name">David Brown</h3>
+                    <p class="text-sm text-gray-500 employee-title">Compliance Officer</p>
+                  </div>
+                </div>
+                <button class="edit-employee-btn text-[#005288] hover:text-[#003865]">
+                  <i class="fas fa-edit"></i>
+                </button>
+              </div>
+              <div class="employee-details">
+                <div class="text-sm text-gray-600">
+                  <div class="flex items-center mb-1">
+                    <i class="fas fa-envelope text-gray-400 w-5"></i>
+                    <span class="employee-email">david.brown@company.com</span>
+                  </div>
+                  <div class="flex items-center">
+                    <i class="fas fa-phone text-gray-400 w-5"></i>
+                    <span class="employee-phone">+1 (555) 567-8901</span>
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <i class="fas fa-clipboard-check mr-1"></i> 0 Active Tasks
+                  </span>
+                </div>
+              </div>
+              
+              <!-- Edit Form (Hidden by Default) -->
+              <div class="employee-edit-form hidden mt-3 pt-3 border-t">
+                <div class="grid grid-cols-1 gap-2">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Name</label>
+                    <input type="text" class="edit-name w-full p-2 border rounded-md text-sm" value="David Brown">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Job Title</label>
+                    <input type="text" class="edit-title w-full p-2 border rounded-md text-sm" value="Compliance Officer">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Email</label>
+                    <input type="email" class="edit-email w-full p-2 border rounded-md text-sm" value="david.brown@company.com">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Phone</label>
+                    <input type="text" class="edit-phone w-full p-2 border rounded-md text-sm" value="+1 (555) 567-8901">
+                  </div>
+                  <div class="flex justify-end space-x-2 mt-2">
+                    <button type="button" class="cancel-edit-btn px-3 py-1 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
+                      Cancel
+                    </button>
+                    <button type="button" class="save-employee-btn px-3 py-1 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Notifications Panel -->
+    <div id="notifications-panel" class="hidden fixed right-0 top-0 h-full bg-white shadow-lg w-80 z-50 transform transition-transform duration-300 translate-x-full">
+      <div class="flex justify-between items-center p-4 border-b">
+        <h2 class="text-lg font-semibold">Notifications</h2>
+        <button id="close-notifications" class="text-gray-400 hover:text-gray-600">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div id="notifications-list" class="p-4 overflow-y-auto" style="max-height: calc(100vh - 60px);">
+        <!-- Notifications will be loaded here -->
+        <div id="no-notifications" class="text-center py-8 text-gray-500">
+          <i class="fas fa-bell-slash text-4xl mb-2"></i>
+          <p>No notifications yet</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Empty array for tasks
+    let tasks = [];
+
+    // Application state
+    let currentEditingTaskId = null;
+    let currentTaskForComments = null;
+    let notifications = [];
+    let currentViewFilter = 'all';
+
+    // Initialize application when DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log("DOM loaded, initializing application...");
+      
+      // Display current date
+      displayCurrentDate();
+      
+      // Load data from localStorage
+      loadTasks();
+      loadNotifications();
+      loadEmployeeData();
+      
+      // Set up event listeners
+      setupEventListeners();
+      
+      // Update dashboard metrics
+      updateDashboard();
+      
+      console.log("Application initialized successfully");
+    });
+    
+    // Load employee data from localStorage
+    function loadEmployeeData() {
+      try {
+        const savedEmployeeData = localStorage.getItem('hseEmployeeData');
+        if (savedEmployeeData) {
+          employeeData = JSON.parse(savedEmployeeData);
+        }
+      } catch (error) {
+        console.error("Error loading employee data:", error);
+      }
+    }
+
+    // Display current date
+    function displayCurrentDate() {
+      const currentDateElement = document.getElementById('current-date');
+      currentDateElement.textContent = new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    }
+
+    // Load tasks from localStorage or use sample data
+    function loadTasks() {
+      try {
+        const savedTasks = localStorage.getItem('hseTasks');
+        if (savedTasks) {
+          tasks = JSON.parse(savedTasks);
+        } else {
+          // Initialize with empty array and save
+          saveTasks();
+        }
+        renderTasks();
+      } catch (error) {
+        console.error("Error loading tasks:", error);
+        showToast("Error loading tasks. Using empty data.", "error");
+        // Fall back to empty array if there's an error
+        tasks = [];
+        saveTasks();
+        renderTasks();
+      }
+    }
+
+    // Load notifications
+    function loadNotifications() {
+      try {
+        const savedNotifications = localStorage.getItem('hseNotifications');
+        if (savedNotifications) {
+          notifications = JSON.parse(savedNotifications);
+          updateNotificationBadge();
+        } else {
+          notifications = [];
+        }
+      } catch (error) {
+        console.error("Error loading notifications:", error);
+        notifications = [];
+      }
+    }
+
+    // Save notifications
+    function saveNotifications() {
+      try {
+        localStorage.setItem('hseNotifications', JSON.stringify(notifications));
+        updateNotificationBadge();
+      } catch (error) {
+        console.error("Error saving notifications:", error);
+      }
+    }
+
+    // Save tasks to localStorage
+    function saveTasks() {
+      try {
+        localStorage.setItem('hseTasks', JSON.stringify(tasks));
+      } catch (error) {
+        console.error("Error saving tasks:", error);
+        showToast("Error saving tasks. Please try again.", "error");
+      }
+    }
+
+    // Update dashboard counters and metrics
+    function updateDashboard() {
+      const now = new Date();
+      
+      // Count tasks by status
+      const totalTasks = tasks.length;
+      const inprogressTasks = tasks.filter(task => task.status === 'inprogress').length;
+      const completedTasks = tasks.filter(task => task.status === 'completed').length;
+      const overdueTasks = tasks.filter(task => {
+        const dueDate = new Date(task.dueDate);
+        return task.status !== 'completed' && dueDate < now;
+      }).length;
+      
+      // Update counters
+      document.getElementById('total-tasks-count').textContent = totalTasks;
+      document.getElementById('inprogress-tasks-count').textContent = inprogressTasks;
+      document.getElementById('completed-tasks-count').textContent = completedTasks;
+      document.getElementById('overdue-tasks-count').textContent = overdueTasks;
+      
+      // Update progress bars
+      const inprogressPercent = totalTasks > 0 ? (inprogressTasks / totalTasks) * 100 : 0;
+      const completedPercent = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+      const overduePercent = totalTasks > 0 ? (overdueTasks / totalTasks) * 100 : 0;
+      
+      document.getElementById('inprogress-tasks-bar').style.width = `${inprogressPercent}%`;
+      document.getElementById('completed-tasks-bar').style.width = `${completedPercent}%`;
+      document.getElementById('overdue-tasks-bar').style.width = `${overduePercent}%`;
+    }
+
+    // Show toast notification
+    function showToast(message, type = 'info') {
+      const toastContainer = document.getElementById('toast-container');
+      
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      
+      let icon = 'info-circle';
+      if (type === 'success') icon = 'check-circle';
+      if (type === 'error') icon = 'times-circle';
+      if (type === 'warning') icon = 'exclamation-triangle';
+      
+      toast.innerHTML = `
+        <i class="fas fa-${icon} mr-2"></i>
+        <span>${message}</span>
+      `;
+      
+      toastContainer.appendChild(toast);
+      
+      // Remove toast after 3 seconds
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => {
+          toast.remove();
+        }, 300);
+      }, 3000);
+    }
+
+    // Render tasks based on filters
+    function renderTasks() {
+      const taskList = document.getElementById('task-list');
+      const statusFilter = document.getElementById('status-filter').value;
+      const priorityFilter = document.getElementById('priority-filter').value;
+      const categoryFilter = document.getElementById('category-filter').value;
+      const assignedFilter = document.getElementById('assigned-filter').value;
+      const searchQuery = document.getElementById('task-search')?.value.toLowerCase() || '';
+
+      // Clear the task list
+      taskList.innerHTML = '';
+
+      // Filter tasks
+      let filteredTasks = [...tasks]; // Make a copy to avoid modifying original array
+      
+      // Apply search filter
+      if (searchQuery) {
+        filteredTasks = filteredTasks.filter(task => 
+          task.title.toLowerCase().includes(searchQuery) ||
+          task.description.toLowerCase().includes(searchQuery)
+        );
+      }
+      
+      // Apply status filter
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'overdue') {
+          filteredTasks = filteredTasks.filter(task => {
+            const today = new Date();
+            const dueDate = new Date(task.dueDate);
+            return task.status !== 'completed' && dueDate < today;
+          });
+        } else {
+          filteredTasks = filteredTasks.filter(task => task.status === statusFilter);
+        }
+      }
+
+      // Apply priority filter
+      if (priorityFilter !== 'all') {
+        filteredTasks = filteredTasks.filter(task => task.priority === priorityFilter);
+      }
+
+      // Apply category filter
+      if (categoryFilter !== 'all') {
+        filteredTasks = filteredTasks.filter(task => task.category === categoryFilter);
+      }
+
+      // Apply assigned filter
+      if (assignedFilter !== 'all') {
+        filteredTasks = filteredTasks.filter(task => task.assignedTo === assignedFilter);
+      }
+      
+      // Apply view filter (today, this week, all)
+      if (currentViewFilter !== 'all') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const endOfWeek = new Date(today);
+        endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
+        
+        if (currentViewFilter === 'today') {
+          filteredTasks = filteredTasks.filter(task => {
+            const dueDate = new Date(task.dueDate);
+            dueDate.setHours(0, 0, 0, 0);
+            return dueDate.getTime() === today.getTime();
+          });
+        } else if (currentViewFilter === 'week') {
+          filteredTasks = filteredTasks.filter(task => {
+            const dueDate = new Date(task.dueDate);
+            dueDate.setHours(0, 0, 0, 0);
+            return dueDate >= today && dueDate <= endOfWeek;
+          });
+        }
+      }
+
+      // Display tasks or show empty state
+      if (filteredTasks.length === 0) {
+        displayEmptyState(taskList);
+      } else {
+        displayTasks(taskList, filteredTasks);
+      }
+    }
+
+    // Display empty state when no tasks match filters
+    function displayEmptyState(container) {
+      const emptyRow = document.createElement('tr');
+      emptyRow.innerHTML = `
+        <td colspan="7" class="px-6 py-10 text-center text-gray-500">
+          <div class="flex flex-col items-center">
+            <i class="fas fa-clipboard text-4xl text-gray-300 mb-3"></i>
+            <p class="text-lg font-medium">No tasks found</p>
+            <p class="text-sm text-gray-400 mt-1">Try changing your filters or add a new task</p>
+          </div>
+        </td>
+      `;
+      container.appendChild(emptyRow);
+    }
+
+    // Display filtered tasks
+    function displayTasks(container, filteredTasks) {
+      filteredTasks.forEach(task => {
+        const row = createTaskRow(task);
+        container.appendChild(row);
+      });
+      
+      // Add event listeners to the new task rows
+      addTaskRowEventListeners();
+    }
+
+    // Create HTML for a task row
+    function createTaskRow(task) {
+      const row = document.createElement('tr');
+      
+      // Check if task is overdue
+      const today = new Date();
+      const dueDate = new Date(task.dueDate);
+      const isOverdue = task.status !== 'completed' && dueDate < today;
+      const status = isOverdue ? 'overdue' : task.status;
+      
+      // Get icons for status and priority
+      const statusIcon = getStatusIcon(status);
+      const priorityIcon = getPriorityIcon(task.priority);
+      const categoryIcon = getCategoryIcon(task.category);
+      
+      // Check if task has comments
+      const hasComments = task.comments && task.comments.length > 0;
+      
+      row.innerHTML = `
+        <td class="px-6 py-4">
+          <div class="flex items-start">
+            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-[#E8F5E9] flex items-center justify-center mr-3">
+              <i class="fas ${categoryIcon} text-[#84BD00]"></i>
+            </div>
+            <div>
+              <div class="flex items-center">
+                <div class="text-sm font-medium text-gray-900">${escapeHtml(task.title)}</div>
+                ${hasComments ? '<span class="ml-2 text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full"><i class="fas fa-comments mr-1"></i>' + task.comments.length + '</span>' : ''}
+              </div>
+              <div class="text-sm text-gray-500">${escapeHtml(task.description)}</div>
+            </div>
+          </div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <span class="category-badge category-${task.category}">
+            <i class="fas ${categoryIcon} mr-1"></i> ${capitalizeFirstLetter(task.category.replace('-', ' '))}
+          </span>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <span class="priority-badge priority-${task.priority}">
+            <i class="fas ${priorityIcon}"></i> ${capitalizeFirstLetter(task.priority)}
+          </span>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <span class="status-badge status-${status}">
+            <i class="fas ${statusIcon}"></i> ${isOverdue ? 'Overdue' : capitalizeFirstLetter(task.status.replace('inprogress', 'In Progress'))}
+          </span>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <div class="flex items-center">
+            <div class="flex-shrink-0 h-8 w-8 bg-gray-200 rounded-full flex items-center justify-center mr-2">
+              <span class="text-sm font-medium text-gray-700">${getInitials(getEmployeeName(task.assignedTo))}</span>
+            </div>
+            <div class="text-sm text-gray-500">${getEmployeeName(task.assignedTo)}</div>
+          </div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-500'}">
+          <div class="flex items-center">
+            <i class="far fa-calendar-alt mr-2 ${isOverdue ? 'text-red-600' : 'text-gray-400'}"></i>
+            ${formatDate(task.dueDate)}
+          </div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+          <button class="text-purple-600 hover:text-purple-900 mr-2 view-comments" data-id="${task.id}" title="View Comments">
+            <i class="fas fa-comments"></i>
+          </button>
+          <button class="text-[#005288] hover:text-[#003865] mr-2 edit-task" data-id="${task.id}" title="Edit Task">
+            <i class="fas fa-edit"></i>
+          </button>
+          <button class="text-[#C62828] hover:text-[#B71C1C] delete-task" data-id="${task.id}" title="Delete Task">
+            <i class="fas fa-trash-alt"></i>
+          </button>
+        </td>
+      `;
+      
+      return row;
+    }
+
+    // Add event listeners to task rows
+    function addTaskRowEventListeners() {
+      // Add edit button event listeners
+      document.querySelectorAll('.edit-task').forEach(button => {
+        button.addEventListener('click', function() {
+          const taskId = parseInt(this.getAttribute('data-id'));
+          editTask(taskId);
+        });
+      });
+
+      // Add delete button event listeners
+      document.querySelectorAll('.delete-task').forEach(button => {
+        button.addEventListener('click', function() {
+          const taskId = parseInt(this.getAttribute('data-id'));
+          deleteTask(taskId);
+        });
+      });
+      
+      // Add comments button event listeners
+      document.querySelectorAll('.view-comments').forEach(button => {
+        button.addEventListener('click', function() {
+          const taskId = parseInt(this.getAttribute('data-id'));
+          showCommentsModal(taskId);
+        });
+      });
+    }
+
+    // Set up all event listeners
+    function setupEventListeners() {
+      console.log("Setting up event listeners...");
+      
+      // Filter change events
+      document.getElementById('status-filter').addEventListener('change', renderTasks);
+      document.getElementById('priority-filter').addEventListener('change', renderTasks);
+      document.getElementById('category-filter').addEventListener('change', renderTasks);
+      document.getElementById('assigned-filter').addEventListener('change', renderTasks);
+      
+      // Search input
+      document.getElementById('task-search').addEventListener('input', function() {
+        renderTasks();
+      });
+      
+      // View toggle buttons
+      document.getElementById('view-all').addEventListener('click', function() {
+        document.querySelectorAll('#view-all, #view-today, #view-week').forEach(btn => {
+          btn.classList.remove('bg-[#005288]', 'text-white');
+          btn.classList.add('bg-white', 'text-gray-700');
+        });
+        this.classList.remove('bg-white', 'text-gray-700');
+        this.classList.add('bg-[#005288]', 'text-white');
+        currentViewFilter = 'all';
+        renderTasks();
+      });
+      
+      document.getElementById('view-today').addEventListener('click', function() {
+        document.querySelectorAll('#view-all, #view-today, #view-week').forEach(btn => {
+          btn.classList.remove('bg-[#005288]', 'text-white');
+          btn.classList.add('bg-white', 'text-gray-700');
+        });
+        this.classList.remove('bg-white', 'text-gray-700');
+        this.classList.add('bg-[#005288]', 'text-white');
+        currentViewFilter = 'today';
+        renderTasks();
+      });
+      
+      document.getElementById('view-week').addEventListener('click', function() {
+        document.querySelectorAll('#view-all, #view-today, #view-week').forEach(btn => {
+          btn.classList.remove('bg-[#005288]', 'text-white');
+          btn.classList.add('bg-white', 'text-gray-700');
+        });
+        this.classList.remove('bg-white', 'text-gray-700');
+        this.classList.add('bg-[#005288]', 'text-white');
+        currentViewFilter = 'week';
+        renderTasks();
+      });
+
+      // Add task button
+      document.getElementById('add-task-btn').addEventListener('click', function() {
+        showTaskModal();
+      });
+
+      // Close modal buttons
+      document.getElementById('cancel-task').addEventListener('click', hideTaskModal);
+      document.getElementById('close-modal').addEventListener('click', hideTaskModal);
+      document.getElementById('close-comments-modal').addEventListener('click', hideCommentsModal);
+      document.getElementById('close-team-modal').addEventListener('click', hideTeamModal);
+
+      // Task form submission
+      document.getElementById('task-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        handleTaskFormSubmit();
+      });
+      
+      // Comment form submission
+      document.getElementById('comment-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        addComment();
+      });
+      
+      // Notifications button
+      document.getElementById('notifications-btn').addEventListener('click', toggleNotificationsPanel);
+      
+      // Team button
+      document.getElementById('team-btn').addEventListener('click', showTeamModal);
+      
+      // Team member edit buttons
+      document.addEventListener('click', function(e) {
+        // Edit employee button
+        if (e.target.closest('.edit-employee-btn')) {
+          const card = e.target.closest('.team-member-card');
+          toggleEmployeeEditMode(card, true);
+        }
+        
+        // Cancel edit button
+        if (e.target.closest('.cancel-edit-btn')) {
+          const card = e.target.closest('.team-member-card');
+          toggleEmployeeEditMode(card, false);
+        }
+        
+        // Save employee button
+        if (e.target.closest('.save-employee-btn')) {
+          const card = e.target.closest('.team-member-card');
+          saveEmployeeChanges(card);
+        }
+      });
+      
+      // Add new employee button
+      document.getElementById('add-employee-btn').addEventListener('click', function() {
+        document.getElementById('new-employee-form').classList.remove('hidden');
+      });
+      
+      // Cancel new employee button
+      document.getElementById('cancel-new-employee').addEventListener('click', function() {
+        document.getElementById('new-employee-form').classList.add('hidden');
+        // Clear form fields
+        document.getElementById('new-employee-name').value = '';
+        document.getElementById('new-employee-title').value = '';
+        document.getElementById('new-employee-email').value = '';
+        document.getElementById('new-employee-phone').value = '';
+      });
+      
+      // Save new employee button
+      document.getElementById('save-new-employee').addEventListener('click', addNewEmployee);
+      
+      // Close notifications panel
+      document.getElementById('close-notifications').addEventListener('click', function() {
+        document.getElementById('notifications-panel').classList.add('hidden');
+        document.getElementById('notifications-panel').classList.remove('translate-x-0');
+        document.getElementById('notifications-panel').classList.add('translate-x-full');
+      });
+      
+      // Export/Import menu toggle
+      document.getElementById('export-import-btn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        const dropdown = document.getElementById('export-import-dropdown');
+        dropdown.classList.toggle('hidden');
+      });
+      
+      // Handle clicking outside export/import dropdown
+      document.addEventListener('click', function() {
+        document.getElementById('export-import-dropdown').classList.add('hidden');
+      });
+      
+      console.log("Event listeners set up successfully");
+    }
+
+    // Function to add a new employee
+    function addNewEmployee() {
+      const name = document.getElementById('new-employee-name').value.trim();
+      const title = document.getElementById('new-employee-title').value.trim();
+      const email = document.getElementById('new-employee-email').value.trim();
+      const phone = document.getElementById('new-employee-phone').value.trim();
+      
+      if (!name) {
+        showToast('Please enter a name for the team member', 'warning');
+        return;
+      }
+      
+      // Generate an ID based on the name (lowercase, replace spaces with hyphens)
+      let employeeId = name.toLowerCase().replace(/\s+/g, '-');
+      
+      // If ID already exists, add a numeric suffix
+      if (employeeData[employeeId]) {
+        let counter = 1;
+        while (employeeData[`${employeeId}-${counter}`]) {
+          counter++;
+        }
+        employeeId = `${employeeId}-${counter}`;
+      }
+      
+      // Add to employeeData
+      employeeData[employeeId] = {
+        name: name,
+        title: title,
+        email: email,
+        phone: phone
+      };
+      
+      // Save to localStorage
+      localStorage.setItem('hseEmployeeData', JSON.stringify(employeeData));
+      
+      // Add to the team list UI
+      addEmployeeToUI(employeeId, name, title, email, phone);
+      
+      // Hide and reset the form
+      document.getElementById('new-employee-form').classList.add('hidden');
+      document.getElementById('new-employee-name').value = '';
+      document.getElementById('new-employee-title').value = '';
+      document.getElementById('new-employee-email').value = '';
+      document.getElementById('new-employee-phone').value = '';
+      
+      // Show success message
+      showToast('Team member added successfully', 'success');
+    }
+    
+    // Function to add an employee to the UI
+    function addEmployeeToUI(employeeId, name, title, email, phone) {
+      const teamContainer = document.querySelector('.grid.grid-cols-1.md\\:grid-cols-2.lg\\:grid-cols-3.gap-4');
+      const initials = getInitials(name);
+      
+      const newEmployeeCard = document.createElement('div');
+      newEmployeeCard.className = 'team-member-card bg-white p-4 border rounded-lg shadow-sm';
+      newEmployeeCard.setAttribute('data-id', employeeId);
+      
+      newEmployeeCard.innerHTML = `
+        <div class="flex justify-between items-start mb-3">
+          <div class="flex items-center">
+            <div class="h-12 w-12 bg-[#E3F2FD] rounded-full flex items-center justify-center mr-3">
+              <span class="text-xl font-medium text-[#005288]">${initials}</span>
+            </div>
+            <div>
+              <h3 class="font-medium employee-name">${escapeHtml(name)}</h3>
+              <p class="text-sm text-gray-500 employee-title">${escapeHtml(title)}</p>
+            </div>
+          </div>
+          <button class="edit-employee-btn text-[#005288] hover:text-[#003865]">
+            <i class="fas fa-edit"></i>
+          </button>
+        </div>
+        <div class="employee-details">
+          <div class="text-sm text-gray-600">
+            <div class="flex items-center mb-1">
+              <i class="fas fa-envelope text-gray-400 w-5"></i>
+              <span class="employee-email">${escapeHtml(email)}</span>
+            </div>
+            <div class="flex items-center">
+              <i class="fas fa-phone text-gray-400 w-5"></i>
+              <span class="employee-phone">${escapeHtml(phone)}</span>
+            </div>
+          </div>
+          <div class="mt-3">
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+              <i class="fas fa-user-plus mr-1"></i> New Team Member
+            </span>
+          </div>
+        </div>
+        
+        <!-- Edit Form (Hidden by Default) -->
+        <div class="employee-edit-form hidden mt-3 pt-3 border-t">
+          <div class="grid grid-cols-1 gap-2">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Name</label>
+              <input type="text" class="edit-name w-full p-2 border rounded-md text-sm" value="${escapeHtml(name)}">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Job Title</label>
+              <input type="text" class="edit-title w-full p-2 border rounded-md text-sm" value="${escapeHtml(title)}">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Email</label>
+              <input type="email" class="edit-email w-full p-2 border rounded-md text-sm" value="${escapeHtml(email)}">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Phone</label>
+              <input type="text" class="edit-phone w-full p-2 border rounded-md text-sm" value="${escapeHtml(phone)}">
+            </div>
+            <div class="flex justify-end space-x-2 mt-2">
+              <button type="button" class="cancel-edit-btn px-3 py-1 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
+                Cancel
+              </button>
+              <button type="button" class="save-employee-btn px-3 py-1 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      teamContainer.prepend(newEmployeeCard);
+    }
+    
+    // Show Team Modal
+    function showTeamModal() {
+      const modal = document.getElementById('team-modal');
+      modal.classList.add('active');
+      
+      // Refresh the employee list to ensure it's up to date with the latest data
+      refreshEmployeeList();
+    }
+    
+    // Refresh the employee list in the modal
+    function refreshEmployeeList() {
+      // This function could be expanded to dynamically rebuild the entire employee list
+      // For now, we'll just ensure the add form is hidden
+      document.getElementById('new-employee-form').classList.add('hidden');
+    }
+    
+    // Hide Team Modal
+    function hideTeamModal() {
+      document.getElementById('team-modal').classList.remove('active');
+    }
+
+    // Toggle notifications panel
+    function toggleNotificationsPanel() {
+      const panel = document.getElementById('notifications-panel');
+      const isHidden = panel.classList.contains('hidden');
+      
+      if (isHidden) {
+        // Show panel
+        panel.classList.remove('hidden');
+        setTimeout(() => {
+          panel.classList.remove('translate-x-full');
+          panel.classList.add('translate-x-0');
+        }, 10);
+        
+        // Clear notification badge
+        clearNotificationBadge();
+        
+        // Render notifications
+        renderNotifications();
+      } else {
+        // Hide panel
+        panel.classList.remove('translate-x-0');
+        panel.classList.add('translate-x-full');
+        setTimeout(() => {
+          panel.classList.add('hidden');
+        }, 300);
+      }
+    }
+
+    // Render notifications
+    function renderNotifications() {
+      const container = document.getElementById('notifications-list');
+      container.innerHTML = '';
+      
+      if (notifications.length === 0) {
+        document.getElementById('no-notifications').classList.remove('hidden');
+        return;
+      }
+      
+      document.getElementById('no-notifications').classList.add('hidden');
+      
+      // Sort notifications by date (newest first)
+      notifications.sort((a, b) => new Date(b.date) - new Date(a.date));
+      
+      notifications.forEach(notification => {
+        const notificationItem = document.createElement('div');
+        notificationItem.className = 'p-3 mb-2 border rounded-lg';
+        
+        let icon = 'info-circle text-blue-500';
+        if (notification.type === 'success') icon = 'check-circle text-green-500';
+        if (notification.type === 'error') icon = 'times-circle text-red-500';
+        if (notification.type === 'warning') icon = 'exclamation-triangle text-yellow-500';
+        
+        const notificationDate = new Date(notification.date);
+        
+        notificationItem.innerHTML = `
+          <div class="flex items-start">
+            <div class="mr-3 mt-1">
+              <i class="fas fa-${icon} text-lg"></i>
+            </div>
+            <div class="flex-1">
+              <div class="font-medium text-sm">${escapeHtml(notification.title)}</div>
+              <div class="text-sm text-gray-500">${escapeHtml(notification.message)}</div>
+              <div class="text-xs text-gray-400 mt-1">${formatDateTime(notificationDate)}</div>
+            </div>
+            <button class="text-gray-400 hover:text-gray-600 delete-notification" data-id="${notification.id}">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        `;
+        
+        container.appendChild(notificationItem);
+      });
+      
+      // Add event listeners to delete buttons
+      document.querySelectorAll('.delete-notification').forEach(button => {
+        button.addEventListener('click', function() {
+          const notificationId = parseInt(this.getAttribute('data-id'));
+          deleteNotification(notificationId);
+        });
+      });
+    }
+
+    // Delete notification
+    function deleteNotification(id) {
+      notifications = notifications.filter(notification => notification.id !== id);
+      saveNotifications();
+      renderNotifications();
+    }
+
+    // Update notification badge
+    function updateNotificationBadge() {
+      const unreadCount = notifications.length;
+      const badge = document.getElementById('notification-badge');
+      
+      if (unreadCount > 0) {
+        badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    // Clear notification badge
+    function clearNotificationBadge() {
+      const badge = document.getElementById('notification-badge');
+      badge.classList.add('hidden');
+    }
+
+    // Show modal for adding a new task
+    function showTaskModal() {
+      currentEditingTaskId = null;
+      const modal = document.getElementById('task-modal');
+      document.getElementById('modal-title').textContent = 'Add New Task';
+      
+      // Reset form
+      const taskForm = document.getElementById('task-form');
+      taskForm.reset();
+      
+      // Set default values
+      document.getElementById('task-category').value = 'lprc';
+      document.getElementById('task-priority').value = 'medium';
+      document.getElementById('task-status').value = 'inprogress';
+      document.getElementById('task-assigned').value = 'john-doe';
+      
+      // Set default due date to tomorrow
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      document.getElementById('task-due-date').value = formatDateForInput(tomorrow);
+      
+      // Show modal
+      modal.classList.add('active');
+    }
+
+    // Hide task modal
+    function hideTaskModal() {
+      const modal = document.getElementById('task-modal');
+      modal.classList.remove('active');
+      currentEditingTaskId = null;
+    }
+
+    // Show comments modal
+    function showCommentsModal(taskId) {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) {
+        console.error(`Task with ID ${taskId} not found`);
+        return;
+      }
+      
+      currentTaskForComments = taskId;
+      
+      // Set modal title
+      document.getElementById('comments-modal-title').textContent = `Comments for: ${task.title}`;
+      
+      // Load comments
+      loadComments(task);
+      
+      // Show modal
+      document.getElementById('comments-modal').classList.add('active');
+    }
+
+    // Hide comments modal
+    function hideCommentsModal() {
+      document.getElementById('comments-modal').classList.remove('active');
+      currentTaskForComments = null;
+    }
+
+    // Load comments for a task
+    function loadComments(task) {
+      const container = document.getElementById('comments-container');
+      container.innerHTML = '';
+      
+      if (!task.comments || task.comments.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-8 text-gray-500">
+            <i class="fas fa-comments text-4xl mb-2"></i>
+            <p>No comments yet</p>
+          </div>
+        `;
+        return;
+      }
+      
+      // Sort comments by date
+      const sortedComments = [...task.comments].sort((a, b) => 
+        new Date(a.date) - new Date(b.date)
+      );
+      
+      sortedComments.forEach(comment => {
+        const commentElement = document.createElement('div');
+        commentElement.className = 'comment-item';
+        
+        const commentDate = new Date(comment.date);
+        
+        commentElement.innerHTML = `
+          <div class="flex justify-between">
+            <span class="text-xs font-medium text-gray-700">${comment.author}</span>
+            <div class="flex items-center">
+              <span class="text-xs text-gray-500 mr-2">${formatDateTime(commentDate)}</span>
+              <button class="delete-comment text-red-500 hover:text-red-700" data-id="${comment.id}">
+                <i class="fas fa-trash-alt text-xs"></i>
+              </button>
+            </div>
+          </div>
+          <p class="text-sm mt-1">${escapeHtml(comment.text)}</p>
+        `;
+        
+        container.appendChild(commentElement);
+      });
+      
+      // Add event listeners to delete comment buttons
+      document.querySelectorAll('.delete-comment').forEach(button => {
+        button.addEventListener('click', function() {
+          const commentId = parseInt(this.getAttribute('data-id'));
+          deleteComment(commentId);
+        });
+      });
+    }
+    
+    // Delete a comment
+    function deleteComment(commentId) {
+      if (!currentTaskForComments) return;
+      
+      const taskIndex = tasks.findIndex(task => task.id === currentTaskForComments);
+      if (taskIndex === -1) return;
+      
+      const task = tasks[taskIndex];
+      
+      if (confirm('Are you sure you want to delete this comment?')) {
+        task.comments = task.comments.filter(comment => comment.id !== commentId);
+        
+        // Save tasks and refresh comments view
+        saveTasks();
+        loadComments(task);
+        renderTasks();
+        
+        showToast('Comment deleted successfully', 'success');
+      }
+    }
+
+    // Add comment to a task
+    function addComment() {
+      if (!currentTaskForComments) return;
+      
+      const commentText = document.getElementById('comment-text').value.trim();
+      if (!commentText) {
+        showToast('Please enter a comment', 'warning');
+        return;
+      }
+      
+      const taskIndex = tasks.findIndex(task => task.id === currentTaskForComments);
+      if (taskIndex === -1) {
+        console.error(`Task with ID ${currentTaskForComments} not found`);
+        return;
+      }
+      
+      // Create comment object
+      const comment = {
+        id: Date.now(),
+        text: commentText,
+        author: 'Current User', // In a real app, this would be the current user's name
+        date: new Date().toISOString()
+      };
+      
+      // Add comment to task
+      if (!tasks[taskIndex].comments) {
+        tasks[taskIndex].comments = [];
+      }
+      
+      tasks[taskIndex].comments.push(comment);
+      
+      // Save tasks
+      saveTasks();
+      
+      // Reload comments
+      loadComments(tasks[taskIndex]);
+      
+      // Clear comment form
+      document.getElementById('comment-text').value = '';
+      
+      // Update task list to show comment count
+      renderTasks();
+      
+      showToast('Comment added successfully', 'success');
+    }
+
+    // Edit task
+    function editTask(taskId) {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) {
+        console.error(`Task with ID ${taskId} not found`);
+        return;
+      }
+      
+      currentEditingTaskId = taskId;
+      
+      // Set form values
+      document.getElementById('modal-title').textContent = 'Edit Task';
+      document.getElementById('task-title').value = task.title;
+      document.getElementById('task-description').value = task.description || '';
+      document.getElementById('task-category').value = task.category;
+      document.getElementById('task-priority').value = task.priority;
+      document.getElementById('task-status').value = task.status;
+      document.getElementById('task-assigned').value = task.assignedTo;
+      document.getElementById('task-due-date').value = formatDateForInput(new Date(task.dueDate));
+      
+      // Show modal
+      document.getElementById('task-modal').classList.add('active');
+    }
+
+    // Delete task
+    function deleteTask(taskId) {
+      if (confirm('Are you sure you want to delete this task?')) {
+        tasks = tasks.filter(task => task.id !== taskId);
+        saveTasks();
+        renderTasks();
+        updateDashboard();
+        showToast('Task deleted successfully', 'success');
+      }
+    }
+
+    // Handle form submission
+    function handleTaskFormSubmit() {
+      const taskData = {
+        title: document.getElementById('task-title').value.trim(),
+        description: document.getElementById('task-description').value.trim(),
+        category: document.getElementById('task-category').value,
+        priority: document.getElementById('task-priority').value,
+        status: document.getElementById('task-status').value,
+        assignedTo: document.getElementById('task-assigned').value,
+        dueDate: document.getElementById('task-due-date').value,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      // Validate form data
+      if (!taskData.title) {
+        showToast('Please enter a task title', 'warning');
+        return;
+      }
+      
+      if (!taskData.dueDate) {
+        showToast('Please select a due date', 'warning');
+        return;
+      }
+      
+      if (currentEditingTaskId) {
+        // Edit existing task
+        const taskIndex = tasks.findIndex(task => task.id === currentEditingTaskId);
+        if (taskIndex !== -1) {
+          // Preserve comments if they exist
+          if (tasks[taskIndex].comments) {
+            taskData.comments = tasks[taskIndex].comments;
+          }
+          
+          // Preserve created date
+          taskData.created = tasks[taskIndex].created;
+          
+          tasks[taskIndex] = { ...tasks[taskIndex], ...taskData };
+        }
+        
+        showToast('Task updated successfully', 'success');
+      } else {
+        // Add new task
+        const newTask = {
+          id: Date.now(),
+          comments: [],
+          created: new Date().toISOString(),
+          ...taskData
+        };
+        
+        tasks.push(newTask);
+        showToast('Task added successfully', 'success');
+      }
+      
+      // Save, update UI and close modal
+      saveTasks();
+      renderTasks();
+      updateDashboard();
+      hideTaskModal();
+    }
+    
+    // Add notification
+    function addNotification(notification) {
+      const notificationObj = {
+        id: notification.id || Date.now(),
+        title: notification.title,
+        message: notification.message,
+        type: notification.type || 'info',
+        date: notification.date || new Date().toISOString(),
+        taskId: notification.taskId
+      };
+      
+      notifications.push(notificationObj);
+      saveNotifications();
+    }
+
+    // Employee data storage
+    let employeeData = {
+      'john-doe': {
+        name: 'John Doe',
+        title: 'Safety Officer',
+        email: 'john.doe@company.com',
+        phone: '+1 (555) 123-4567'
+      },
+      'jane-smith': {
+        name: 'Jane Smith',
+        title: 'HSE Manager',
+        email: 'jane.smith@company.com',
+        phone: '+1 (555) 234-5678'
+      },
+      'mike-johnson': {
+        name: 'Mike Johnson',
+        title: 'Safety Engineer',
+        email: 'mike.johnson@company.com',
+        phone: '+1 (555) 345-6789'
+      },
+      'sarah-williams': {
+        name: 'Sarah Williams',
+        title: 'Environmental Specialist',
+        email: 'sarah.williams@company.com',
+        phone: '+1 (555) 456-7890'
+      },
+      'david-brown': {
+        name: 'David Brown',
+        title: 'Compliance Officer',
+        email: 'david.brown@company.com',
+        phone: '+1 (555) 567-8901'
+      }
+    };
+    
+    // Function to toggle employee edit mode
+    function toggleEmployeeEditMode(card, enableEdit) {
+      const detailsSection = card.querySelector('.employee-details');
+      const editForm = card.querySelector('.employee-edit-form');
+      
+      if (enableEdit) {
+        detailsSection.classList.add('hidden');
+        editForm.classList.remove('hidden');
+      } else {
+        // Reset form values to match current data
+        const employeeId = card.getAttribute('data-id');
+        const employee = employeeData[employeeId];
+        
+        if (employee) {
+          card.querySelector('.edit-name').value = employee.name;
+          card.querySelector('.edit-title').value = employee.title;
+          card.querySelector('.edit-email').value = employee.email;
+          card.querySelector('.edit-phone').value = employee.phone;
+        }
+        
+        detailsSection.classList.remove('hidden');
+        editForm.classList.add('hidden');
+      }
+    }
+    
+    // Function to save employee changes
+    function saveEmployeeChanges(card) {
+      const employeeId = card.getAttribute('data-id');
+      const newName = card.querySelector('.edit-name').value.trim();
+      const newTitle = card.querySelector('.edit-title').value.trim();
+      const newEmail = card.querySelector('.edit-email').value.trim();
+      const newPhone = card.querySelector('.edit-phone').value.trim();
+      
+      if (!newName) {
+        showToast('Employee name cannot be empty', 'error');
+        return;
+      }
+      
+      // Update employee data
+      employeeData[employeeId] = {
+        name: newName,
+        title: newTitle,
+        email: newEmail,
+        phone: newPhone
+      };
+      
+      // Update visual elements
+      card.querySelector('.employee-name').textContent = newName;
+      card.querySelector('.employee-title').textContent = newTitle;
+      card.querySelector('.employee-email').textContent = newEmail;
+      card.querySelector('.employee-phone').textContent = newPhone;
+      
+      // Update initials in the avatar
+      const initials = getInitials(newName);
+      const avatarElement = card.querySelector('.h-12.w-12 span');
+      if (avatarElement) {
+        avatarElement.textContent = initials;
+      }
+      
+      // Save to localStorage for persistence
+      localStorage.setItem('hseEmployeeData', JSON.stringify(employeeData));
+      
+      // Close edit form
+      toggleEmployeeEditMode(card, false);
+      
+      showToast('Employee information updated successfully', 'success');
+    }
+    
+    // Helper functions
+    function getInitials(name) {
+      if (!name) return '';
+      return name
+        .split(' ')
+        .map(part => part.charAt(0))
+        .join('');
+    }
+    
+    function getStatusIcon(status) {
+      switch(status) {
+        case 'inprogress': return 'fa-spinner';
+        case 'completed': return 'fa-check-circle';
+        case 'overdue': return 'fa-exclamation-circle';
+        default: return 'fa-info-circle';
+      }
+    }
+    
+    function getPriorityIcon(priority) {
+      switch(priority) {
+        case 'low': return 'fa-arrow-down';
+        case 'medium': return 'fa-minus';
+        case 'high': return 'fa-arrow-up';
+        case 'critical': return 'fa-exclamation';
+        default: return 'fa-info';
+      }
+    }
+    
+    function getCategoryIcon(category) {
+      switch(category) {
+        case 'lprc': return 'fa-shield-alt';
+        case 'documentation': return 'fa-file-alt';
+        case 'incident': return 'fa-exclamation-circle';
+        case 'risk-assessment': return 'fa-chart-line';
+        case 'compliance': return 'fa-check-double';
+        default: return 'fa-tasks';
+      }
+    }
+    
+    function getEmployeeName(employeeId) {
+      return employeeData[employeeId]?.name || employeeId;
+    }
+    
+    function capitalizeFirstLetter(string) {
+      // Special case for LPRC
+      if (string.toLowerCase() === 'lprc') {
+        return 'LPRC';
+      }
+      
+      return string
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    }
+    
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleDateString();
+    }
+    
+    function formatDateTime(date) {
+      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    function formatDateForInput(date) {
+      return date.toISOString().split('T')[0];
+    }
+    
+    // Escape HTML to prevent XSS
+    function escapeHtml(unsafe) {
+      if (!unsafe) return '';
+      return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
